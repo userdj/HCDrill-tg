@@ -1,5 +1,5 @@
 /*
-* HCDrill v1.0.0 - Telegram version
+* HCDrill v1.0.2 - Telegram version
 * Coded by PANCHO7532 - P7COMunications LLC
 * Copyright (c) HCTools Group - 2020
 *
@@ -19,7 +19,7 @@ const validExtensions = [
     ".hc"
 ];
 //splash
-console.log("HCDrill v1.0\r\nCopyright (c) HCTools Group - 2020\r\nCoded by P7COMunications LLC");
+console.log("HCDrill v1.0.2\r\nCopyright (c) HCTools Group - 2020\r\nCoded by P7COMunications LLC");
 for(c = 0; c < process.argv.length; c++) {
     switch(process.argv[c]) {
         case "--botToken":
@@ -88,15 +88,9 @@ bot.on("message", function(message) {
         var localFilePath = fileDownload("https://api.telegram.org/file/bot" + botToken + "/" + result["file_path"]);
         if(localFilePath == -1) {
             bot.sendMessage(message.chat.id, "Invalid file or metadata info.", {reply_to_message_id: message.message_id});
-            if(cleanFiles) {
-                fs.unlinkSync(downloadDirectory + localFilePath);
-            }
             return;
         } else if(localFilePath == -2) {
             bot.sendMessage(message.chat.id, "The file is too heavy!", {reply_to_message_id: message.message_id});
-            if(cleanFiles) {
-                fs.unlinkSync(downloadDirectory + localFilePath);
-            }
             return
         }
         var localApiResult = JSON.parse(require("./lib/httpCustom").decrypt(fs.readFileSync(downloadDirectory + localFilePath)));
@@ -135,10 +129,21 @@ bot.on("message", function(message) {
         if(!!message.caption && message.caption.indexOf("raw") != -1) {
             response+="\r\n(RAW Value)-> " + decryptedContent["raw"];
         }
-        if(response.length > 4095) {
-            bot.sendMessage(message.chat.id, response.substring(0, Math.round(response.length/2)), {reply_to_message_id: message.message_id}).then(function(){
-                bot.sendMessage(message.chat.id, response.substring(Math.round(response.length/2), response.length), {reply_to_message_id: message.message_id});
-            });
+        if(!!message.caption && message.caption.indexOf("json") != -1) {
+            response = JSON.stringify(decryptedContent);
+        }
+        response += "\r\n\r\nSatisfied with the result? Follow us!\r\n\u{1F310} BOT CHANNEL: @hctoolschannel\r\n\u{1F310} BOT GROUP: @hctools\r\n\u{1F4BB} SOURCE CODE: https://github.com/hctools/hcdrill-tg";
+        if(response.length > 4096) {
+            if(response.length < 8192) {
+                //it's under THAT two message limit
+                bot.sendMessage(message.chat.id, response.substring(0, 4096), {reply_to_message_id: message.message_id}).then(function(){
+                    var response2 = response.substring(Math.round(4096, response.length));
+                    bot.sendMessage(message.chat.id, response2, {reply_to_message_id: message.message_id});
+                });
+            } else {
+                //we cant afford a two message split with this length, so, for avoid spam, we send it as a document instead.
+                bot.sendDocument(message.chat.id, Buffer.from(response), {caption: "The decrypted content is too large to be sent on Telegram. Instead we sent you a text file with the decrypted data.\r\n\r\nSatisfied with the result? Follow us!\r\n\u{1F310} BOT CHANNEL: @hctoolschannel\r\n\u{1F310} BOT GROUP: @hctools\r\n\u{1F4BB} SOURCE CODE: https://github.com/hctools/hcdrill-tg", reply_to_message_id: message.message_id}, {filename: message.from.id + "_" + response.length + Math.round(Math.random()*1000) + ".txt", contentType: "application/octet-stream"});
+            }
         } else {
             bot.sendMessage(message.chat.id, response, {reply_to_message_id: message.message_id});
         }
